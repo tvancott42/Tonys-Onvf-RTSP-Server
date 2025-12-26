@@ -1,5 +1,6 @@
-
-from flask import Flask, jsonify, request, send_from_directory
+import functools
+from datetime import timedelta
+from flask import Flask, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -39,6 +40,10 @@ def create_web_app(manager):
     app = Flask(__name__, static_folder=static_folder, static_url_path='/static')
     CORS(app, origins=ALLOWED_CORS_ORIGINS)
 
+    # Session configuration
+    app.secret_key = os.environ.get('FLASK_SECRET_KEY', os.urandom(24))
+    app.permanent_session_lifetime = timedelta(days=30)
+
     # Initialize rate limiter
     limiter = Limiter(
         key_func=get_remote_address,
@@ -54,6 +59,83 @@ def create_web_app(manager):
     # Suppress Flask/Werkzeug logging
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
+
+    # --- Authentication Decorator ---
+    def login_required(f):
+        @functools.wraps(f)
+        def decorated_function(*args, **kwargs):
+            if not manager.auth_enabled:
+                return f(*args, **kwargs)
+
+            if 'authenticated' not in session:
+                if request.is_json:
+                    return jsonify({'error': 'Authentication required'}), 401
+                return redirect(url_for('login'))
+            return f(*args, **kwargs)
+        return decorated_function
+
+    # --- Auth Routes ---
+
+    @app.route('/login', methods=['GET', 'POST'])
+    def login():
+        if manager.is_setup_required():
+            return redirect(url_for('setup'))
+
+        if request.method == 'POST':
+            data = request.form if request.form else request.json
+            username = data.get('username', '')
+            password = data.get('password', '')
+
+            if manager.verify_login(username, password):
+                session.permanent = True
+                session['authenticated'] = True
+                if request.is_json:
+                    return jsonify({'success': True})
+                return redirect(url_for('index'))
+            else:
+                if request.is_json:
+                    return jsonify({'error': 'Invalid credentials'}), 401
+                return send_from_directory(static_folder, 'login.html')
+
+        return send_from_directory(static_folder, 'login.html')
+
+    @app.route('/setup', methods=['GET', 'POST'])
+    def setup():
+        if not manager.is_setup_required() and manager.auth_enabled:
+            return redirect(url_for('login'))
+
+        if request.method == 'POST':
+            data = request.form if request.form else request.json
+            username = data.get('username', '')
+            password = data.get('password', '')
+
+            if username and password:
+                manager.setup_user(username, password)
+                session.permanent = True
+                session['authenticated'] = True
+                if request.is_json:
+                    return jsonify({'success': True})
+                return redirect(url_for('index'))
+            else:
+                if request.is_json:
+                    return jsonify({'error': 'Username and password required'}), 400
+
+        return send_from_directory(static_folder, 'setup.html')
+
+    @app.route('/setup/skip', methods=['POST'])
+    def skip_setup():
+        """Skip setup - disable authentication"""
+        manager.auth_enabled = False
+        manager.save_config()
+        session['authenticated'] = True
+        if request.is_json:
+            return jsonify({'success': True})
+        return redirect(url_for('index'))
+
+    @app.route('/logout')
+    def logout():
+        session.pop('authenticated', None)
+        return redirect(url_for('login'))
 
     @app.route('/api/onvif/probe', methods=['POST'])
     @limiter.limit(RATE_LIMIT_PROBE)
@@ -140,8 +222,13 @@ def create_web_app(manager):
             return jsonify({'error': str(e)}), 500
 
     @app.route('/')
+    @login_required
     def index():
         """Serve the main HTML page from static files"""
+        # Check if setup is required first
+        if manager.is_setup_required():
+            return redirect(url_for('setup'))
+
         response = send_from_directory(static_folder, 'index.html')
         # Add headers to prevent caching
         response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Tonys Onvif-RTSP Server</title>
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 min-h-screen flex items-center justify-center transition-colors duration-300">
+    <div class="w-full max-w-md px-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 transition-colors duration-300">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-4">&#127909;</div>
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Tonys Onvif-RTSP Server</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Sign in to access the dashboard</p>
+            </div>
+
+            <div id="error-message" class="hidden alert-danger mb-6">
+                <p id="error-text">Invalid username or password</p>
+            </div>
+
+            <form id="login-form" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label" for="username">Username</label>
+                    <input type="text" class="form-input" id="username" name="username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Password</label>
+                    <input type="password" class="form-input" id="password" name="password" required>
+                </div>
+
+                <button type="submit" class="btn-primary w-full mt-6" id="login-btn">
+                    Sign In
+                </button>
+            </form>
+        </div>
+
+        <p class="text-center text-slate-500 dark:text-slate-400 text-sm mt-6">
+            &copy; 2025 Tonys Onvif-RTSP Server
+        </p>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const btn = document.getElementById('login-btn');
+            const errorMsg = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+
+            btn.disabled = true;
+            btn.innerHTML = 'Signing in...';
+            errorMsg.classList.add('hidden');
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            try {
+                const response = await fetch('/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    const data = await response.json();
+                    errorText.textContent = data.error || 'Invalid username or password';
+                    errorMsg.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Sign In';
+                }
+            } catch (err) {
+                errorText.textContent = 'Connection error. Please try again.';
+                errorMsg.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = 'Sign In';
+            }
+        }
+    </script>
+</body>
+</html>

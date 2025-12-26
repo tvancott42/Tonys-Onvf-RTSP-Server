@@ -864,6 +864,15 @@ function loadSettingsForm() {
         autoBootField.checked = settings.autoBoot === true;
     }
 
+    // RTSP Authentication settings
+    const rtspAuthEnabled = document.getElementById('rtspAuthEnabled');
+    if (rtspAuthEnabled) {
+        rtspAuthEnabled.checked = settings.rtspAuthEnabled === true;
+        toggleRtspAuthFields();
+    }
+    document.getElementById('globalUsername').value = settings.globalUsername || 'admin';
+    document.getElementById('globalPassword').value = settings.globalPassword || '';
+
     // Auto-detect server IP
     const serverIpField = document.getElementById('serverIp');
     if (!serverIpField.value || serverIpField.value === 'localhost') {
@@ -883,7 +892,10 @@ async function saveSettings(event) {
         theme: document.getElementById('themeSelect').value,
         gridColumns: parseInt(document.getElementById('gridColumnsSelect').value),
         rtspPort: parseInt(document.getElementById('rtspPortSettings').value || 8554),
-        autoBoot: document.getElementById('autoBoot')?.checked || false
+        autoBoot: document.getElementById('autoBoot')?.checked || false,
+        rtspAuthEnabled: document.getElementById('rtspAuthEnabled')?.checked || false,
+        globalUsername: document.getElementById('globalUsername')?.value || 'admin',
+        globalPassword: document.getElementById('globalPassword')?.value || 'admin'
     };
 
     showLoading('Saving settings...');
@@ -1243,6 +1255,19 @@ function toggleStaticFields() {
 
     if (fields) {
         if (useVnic && ipMode === 'static') {
+            fields.classList.remove('hidden');
+        } else {
+            fields.classList.add('hidden');
+        }
+    }
+}
+
+function toggleRtspAuthFields() {
+    const rtspAuthEnabled = document.getElementById('rtspAuthEnabled')?.checked || false;
+    const fields = document.getElementById('rtsp-auth-fields');
+
+    if (fields) {
+        if (rtspAuthEnabled) {
             fields.classList.remove('hidden');
         } else {
             fields.classList.add('hidden');

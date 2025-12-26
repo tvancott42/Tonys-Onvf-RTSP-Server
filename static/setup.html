@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - Tonys Onvif-RTSP Server</title>
+    <link rel="stylesheet" href="/static/css/tailwind.min.css">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 min-h-screen flex items-center justify-center transition-colors duration-300">
+    <div class="w-full max-w-md px-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-lg p-8 transition-colors duration-300">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-4">&#127909;</div>
+                <h1 class="text-2xl font-bold text-slate-800 dark:text-white">Welcome!</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Set up your admin account to get started</p>
+            </div>
+
+            <div id="error-message" class="hidden alert-danger mb-6">
+                <p id="error-text">An error occurred</p>
+            </div>
+
+            <form id="setup-form" onsubmit="handleSetup(event)">
+                <div class="form-group">
+                    <label class="form-label" for="username">Admin Username</label>
+                    <input type="text" class="form-input" id="username" name="username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="password">Admin Password</label>
+                    <input type="password" class="form-input" id="password" name="password" required minlength="4">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="confirm-password">Confirm Password</label>
+                    <input type="password" class="form-input" id="confirm-password" name="confirmPassword" required minlength="4">
+                </div>
+
+                <button type="submit" class="btn-success w-full mt-6" id="setup-btn">
+                    Create Account
+                </button>
+            </form>
+
+            <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                <p class="text-center text-slate-500 dark:text-slate-400 text-sm mb-4">
+                    Or continue without authentication
+                </p>
+                <button onclick="skipSetup()" class="btn-secondary w-full" id="skip-btn">
+                    Skip Setup (No Authentication)
+                </button>
+            </div>
+        </div>
+
+        <p class="text-center text-slate-500 dark:text-slate-400 text-sm mt-6">
+            &copy; 2025 Tonys Onvif-RTSP Server
+        </p>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        if (savedTheme === 'dark') {
+            document.documentElement.classList.add('dark');
+        }
+
+        async function handleSetup(event) {
+            event.preventDefault();
+            const btn = document.getElementById('setup-btn');
+            const errorMsg = document.getElementById('error-message');
+            const errorText = document.getElementById('error-text');
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                errorText.textContent = 'Passwords do not match';
+                errorMsg.classList.remove('hidden');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.innerHTML = 'Creating account...';
+            errorMsg.classList.add('hidden');
+
+            try {
+                const response = await fetch('/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    const data = await response.json();
+                    errorText.textContent = data.error || 'Setup failed. Please try again.';
+                    errorMsg.classList.remove('hidden');
+                    btn.disabled = false;
+                    btn.innerHTML = 'Create Account';
+                }
+            } catch (err) {
+                errorText.textContent = 'Connection error. Please try again.';
+                errorMsg.classList.remove('hidden');
+                btn.disabled = false;
+                btn.innerHTML = 'Create Account';
+            }
+        }
+
+        async function skipSetup() {
+            const btn = document.getElementById('skip-btn');
+            btn.disabled = true;
+            btn.innerHTML = 'Skipping...';
+
+            try {
+                const response = await fetch('/setup/skip', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    window.location.href = '/';
+                } else {
+                    btn.disabled = false;
+                    btn.innerHTML = 'Skip Setup (No Authentication)';
+                }
+            } catch (err) {
+                btn.disabled = false;
+                btn.innerHTML = 'Skip Setup (No Authentication)';
+            }
+        }
+    </script>
+</body>
+</html>

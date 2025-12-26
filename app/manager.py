@@ -4,8 +4,11 @@ import sys
 import threading
 import tempfile
 import re
+import secrets
+import string
 from pathlib import Path
 from urllib.parse import quote
+from werkzeug.security import generate_password_hash, check_password_hash
 from .config import CONFIG_FILE, MEDIAMTX_PORT
 from .camera import VirtualONVIFCamera
 from .onvif_service import ONVIFService
@@ -76,6 +79,13 @@ class CameraManager:
         self.mediamtx = MediaMTXManager()
         self.service_mgr = LinuxServiceManager()
         self._lock = threading.Lock()
+
+        # Web UI auth settings
+        self.auth_enabled = False
+        self.username = None
+        self.password_hash = None
+        self.session_token = None
+
         self.load_config()
 
     def load_config(self):
@@ -100,6 +110,16 @@ class CameraManager:
             self.grid_columns = config.get('settings', {}).get('gridColumns', 3)
             self.rtsp_port = config.get('settings', {}).get('rtspPort', 8554)
             self.auto_boot = config.get('settings', {}).get('autoBoot', False)
+            # RTSP authentication settings
+            self.global_username = config.get('settings', {}).get('globalUsername', 'admin')
+            self.global_password = config.get('settings', {}).get('globalPassword', 'admin')
+            self.rtsp_auth_enabled = config.get('settings', {}).get('rtspAuthEnabled', False)
+
+            # Load web UI auth settings
+            auth = config.get('auth', {})
+            self.auth_enabled = auth.get('enabled', False)
+            self.username = auth.get('username')
+            self.password_hash = auth.get('password_hash')
         else:
             self.server_ip = 'localhost'
             self.open_browser = True
@@ -107,6 +127,9 @@ class CameraManager:
             self.grid_columns = 3
             self.rtsp_port = 8554
             self.auto_boot = False
+            self.global_username = 'admin'
+            self.global_password = 'admin'
+            self.rtsp_auth_enabled = False
             self.save_config()
 
     def save_config(self):
@@ -119,7 +142,15 @@ class CameraManager:
                 'theme': getattr(self, 'theme', 'dark'),
                 'gridColumns': getattr(self, 'grid_columns', 3),
                 'rtspPort': getattr(self, 'rtsp_port', 8554),
-                'autoBoot': getattr(self, 'auto_boot', False)
+                'autoBoot': getattr(self, 'auto_boot', False),
+                'globalUsername': getattr(self, 'global_username', 'admin'),
+                'globalPassword': getattr(self, 'global_password', 'admin'),
+                'rtspAuthEnabled': getattr(self, 'rtsp_auth_enabled', False)
+            },
+            'auth': {
+                'enabled': getattr(self, 'auth_enabled', False),
+                'username': getattr(self, 'username', None),
+                'password_hash': getattr(self, 'password_hash', None)
             }
         }
 
@@ -158,6 +189,10 @@ class CameraManager:
                         self.grid_columns = settings.get('gridColumns', 3)
                         self.rtsp_port = settings.get('rtspPort', 8554)
                         self.auto_boot = settings.get('autoBoot', False)
+                        # RTSP auth settings
+                        self.global_username = settings.get('globalUsername', 'admin')
+                        self.global_password = settings.get('globalPassword', 'admin')
+                        self.rtsp_auth_enabled = settings.get('rtspAuthEnabled', False)
                 except Exception as e:
                     # If reading fails (e.g. file busy), we just fall back to the last known
                     # value stored in self.server_ip, which is much safer.
@@ -169,7 +204,10 @@ class CameraManager:
             'theme': self.theme,
             'gridColumns': self.grid_columns,
             'rtspPort': self.rtsp_port,
-            'autoBoot': self.auto_boot
+            'autoBoot': self.auto_boot,
+            'globalUsername': getattr(self, 'global_username', 'admin'),
+            'globalPassword': getattr(self, 'global_password', 'admin'),
+            'rtspAuthEnabled': getattr(self, 'rtsp_auth_enabled', False)
         }
 
     def save_settings(self, settings):
@@ -179,6 +217,11 @@ class CameraManager:
         self.theme = settings.get('theme', self.theme)
         self.grid_columns = int(settings.get('gridColumns', self.grid_columns))
         self.rtsp_port = int(settings.get('rtspPort', self.rtsp_port))
+
+        # RTSP authentication settings
+        self.global_username = settings.get('globalUsername', self.global_username)
+        self.global_password = settings.get('globalPassword', self.global_password)
+        self.rtsp_auth_enabled = settings.get('rtspAuthEnabled', self.rtsp_auth_enabled)
 
         # Handle auto-boot setting (Linux only)
         new_auto_boot = settings.get('autoBoot', False)
@@ -201,7 +244,10 @@ class CameraManager:
             'theme': self.theme,
             'gridColumns': self.grid_columns,
             'rtspPort': self.rtsp_port,
-            'autoBoot': self.auto_boot
+            'autoBoot': self.auto_boot,
+            'globalUsername': self.global_username,
+            'globalPassword': self.global_password,
+            'rtspAuthEnabled': self.rtsp_auth_enabled
         }
 
     def is_port_available(self, port, exclude_camera_id=None):
@@ -454,3 +500,31 @@ class CameraManager:
         for camera in self.cameras:
             camera.stop()
         self.mediamtx.restart(self.cameras)
+
+    # --- Authentication Methods ---
+
+    def is_setup_required(self):
+        """Check if initial setup is required (no user configured yet)"""
+        return not self.username and not self.password_hash
+
+    def setup_user(self, username, password):
+        """Initial setup of username and password"""
+        self.username = username
+        self.password_hash = generate_password_hash(password)
+        self.auth_enabled = True
+        self.save_config()
+        return True
+
+    def verify_login(self, username, password):
+        """Verify login credentials"""
+        if not self.auth_enabled:
+            return True
+
+        if username == self.username and check_password_hash(self.password_hash, password):
+            return True
+        return False
+
+    def generate_session_token(self):
+        """Generate a random session token"""
+        alphabet = string.ascii_letters + string.digits
+        return ''.join(secrets.choice(alphabet) for _ in range(32))

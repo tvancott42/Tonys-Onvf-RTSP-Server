@@ -276,10 +276,15 @@ class MediaMTXManager:
             traceback.print_exc()
             return False
 
-    def create_config(self, cameras, rtsp_port=None):
+    def create_config(self, cameras, rtsp_port=None, rtsp_username=None, rtsp_password=None):
         """Create MediaMTX configuration optimized for multiple cameras and viewers"""
         if rtsp_port is None:
             rtsp_port = MEDIAMTX_PORT
+
+        # Check if authentication is enabled
+        enable_auth = bool(rtsp_username and rtsp_password)
+        if enable_auth:
+            logger.info("RTSP authentication enabled (user: %s)", rtsp_username)
 
         config = {
             # ===== NETWORK SETTINGS =====
@@ -473,15 +478,30 @@ class MediaMTXManager:
         logger.info("Total running cameras: %d", running_count)
         logger.info("Total streams: %d (main + sub)", running_count * 2)
 
+        # Add authentication config if enabled
+        if enable_auth:
+            config['authMethod'] = 'internal'
+            config['authInternalUsers'] = [{
+                'user': str(rtsp_username),
+                'pass': str(rtsp_password),
+                'permissions': [{
+                    'action': 'publish'
+                }, {
+                    'action': 'read'
+                }, {
+                    'action': 'playback'
+                }]
+            }]
+
         with open(self.config_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
-    def start(self, cameras, rtsp_port=None):
+    def start(self, cameras, rtsp_port=None, rtsp_username=None, rtsp_password=None):
         """Start MediaMTX server"""
         if not self.download_mediamtx():
             return False
 
-        self.create_config(cameras, rtsp_port=rtsp_port)
+        self.create_config(cameras, rtsp_port=rtsp_port, rtsp_username=rtsp_username, rtsp_password=rtsp_password)
 
         logger.info("Starting MediaMTX RTSP Server...")
 
@@ -526,9 +546,9 @@ class MediaMTXManager:
             self.process = None
             logger.info("MediaMTX stopped")
 
-    def restart(self, cameras):
+    def restart(self, cameras, rtsp_port=None, rtsp_username=None, rtsp_password=None):
         """Restart MediaMTX with new configuration"""
         logger.info("Restarting MediaMTX...")
         self.stop()
         time.sleep(3)
-        return self.start(cameras)
+        return self.start(cameras, rtsp_port=rtsp_port, rtsp_username=rtsp_username, rtsp_password=rtsp_password)

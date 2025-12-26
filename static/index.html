@@ -17,7 +17,7 @@
                     <h1 class="text-2xl md:text-3xl font-bold text-slate-800 dark:text-white flex items-center gap-3">
                         <span class="text-3xl">&#127909;</span>
                         Tonys Onvif-RTSP Server
-                        <span class="text-sm font-normal bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">v4.0</span>
+                        <span class="text-sm font-normal bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 px-2 py-1 rounded-full">v4.3</span>
                     </h1>
                     <p class="text-slate-500 dark:text-slate-400 mt-1">Virtual ONVIF camera management dashboard</p>
                 </div>
@@ -94,7 +94,7 @@
 
         <!-- Footer -->
         <footer class="mt-12 py-6 text-center border-t border-slate-200 dark:border-slate-700">
-            <p class="text-slate-500 dark:text-slate-400 text-sm mb-3">&copy; 2025 Tonys Onvif-RTSP Server v4.0 - Created by Tony</p>
+            <p class="text-slate-500 dark:text-slate-400 text-sm mb-3">&copy; 2025 Tonys Onvif-RTSP Server v4.3 - Created by Tony</p>
             <a href="https://buymeacoffee.com/tonytones" target="_blank" class="inline-flex items-center gap-2 px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-black font-semibold rounded-lg transition-all hover:scale-105 shadow-lg">
                 &#9749; Buy Tony a coffee
             </a>
@@ -420,7 +420,37 @@
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 ml-7">Creates and enables a systemd service to start this server automatically</p>
                 </div>
 
-                <button type="submit" class="btn-success w-full">
+                <!-- RTSP Authentication -->
+                <div class="mt-6 pt-6 border-t border-slate-200 dark:border-slate-700">
+                    <h3 class="text-sm font-semibold text-slate-500 dark:text-slate-400 mb-4 flex items-center gap-2">
+                        &#128274; RTSP Authentication
+                    </h3>
+
+                    <div class="form-group">
+                        <label class="flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" id="rtspAuthEnabled" onchange="toggleRtspAuthFields()" class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="text-sm text-slate-700 dark:text-slate-300">Enable RTSP Authentication</span>
+                        </label>
+                        <p class="text-xs text-slate-500 dark:text-slate-400 mt-1 ml-7">Require credentials for RTSP stream access</p>
+                    </div>
+
+                    <div id="rtsp-auth-fields" class="hidden space-y-4 mt-4 p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+                        <div class="form-group">
+                            <label class="form-label">&#128100; Global RTSP Username</label>
+                            <input type="text" class="form-input" id="globalUsername" placeholder="admin">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">&#128273; Global RTSP Password</label>
+                            <input type="password" class="form-input" id="globalPassword" placeholder="admin">
+                        </div>
+                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                            These credentials will be required to access any RTSP stream from this server.
+                            After saving, restart the server for changes to take effect.
+                        </p>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-success w-full mt-6">
                     &#128190; Save Settings
                 </button>
             </form>
